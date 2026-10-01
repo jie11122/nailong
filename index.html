@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffe8b8">
+<meta name="description" content="奶龙合成：2048 恶搞版，合并奶龙升级表情，微信内打开即玩，离线可用。">
+<meta property="og:title" content="奶龙合成">
+<meta property="og:description" content="滑动合并奶龙，等级越高表情越离谱！">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23ffe9c4'/%3E%3Cellipse cx='50' cy='56' rx='29' ry='26' fill='%23fff8e1' stroke='%23eebd4f' stroke-width='3'/%3E%3Cpath d='M33 27 Q32 12 44 12 Q41 20 40 27 Z' fill='%23f6b93b'/%3E%3Cpath d='M67 27 Q68 12 56 12 Q59 20 60 27 Z' fill='%23f6b93b'/%3E%3Ccircle cx='40' cy='48' r='5' fill='%234a3728'/%3E%3Ccircle cx='60' cy='48' r='5' fill='%234a3728'/%3E%3Cpath d='M41 62 Q50 70 59 62' fill='none' stroke='%238a4b3a' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>奶龙合成</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #fff7dd 0%, #ffeab6 55%, #ffd98c 100%);
+    background-attachment: fixed;
+    color: #7a5a22;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 12px;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    overflow-y: auto;
+    overscroll-behavior: none;
+  }
+  .container { width: 100%; max-width: 460px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .title {
+    font-size: 40px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, #ffb43a, #ff7a59 50%, #e0509a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .scores { display: flex; gap: 8px; }
+  .score-box {
+    min-width: 76px;
+    padding: 8px 12px;
+    background: #fffdf4;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(190,140,40,.18);
+  }
+  .score-box.bump { animation: bump 150ms ease; }
+  @keyframes bump { 50% { transform: scale(1.1); } }
+  .score-box .label { font-size: 11px; color: #b08a4a; letter-spacing: 2px; }
+  .score-box .value { font-size: 22px; font-weight: 800; color: #6b4a1f; line-height: 1.2; }
+  .controls { display: flex; gap: 8px; margin-bottom: 10px; }
+  .btn {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #ffb43a, #ff8f3d);
+    box-shadow: 0 3px 8px rgba(255,140,50,.3);
+    cursor: pointer;
+    transition: filter .15s;
+    touch-action: manipulation;
+  }
+  .btn:active { filter: brightness(1.12); }
+  .btn:disabled { opacity: .45; }
+  .btn-ghost { background: #fffdf4; color: #8a6a30; box-shadow: 0 2px 6px rgba(190,140,40,.18); }
+  .btn-mute { flex: 0 0 54px; font-size: 18px; }
+  .hint { text-align: center; color: #a5834a; font-size: 13px; margin-bottom: 12px; }
+  .board {
+    position: relative;
+    width: 100%;
+    padding-bottom: 100%; /* 保持正方形，兼容老内核 */
+    background: #ffdf9c;
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(200,140,30,.25), inset 0 1px 0 rgba(255,255,255,.4);
+    touch-action: none;
+  }
+  .grid, .layer, .overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+  .cell { background: #fff6d8; border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
+  .tile {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    transition: transform 120ms ease-in-out;
+    will-change: transform;
+  }
+  .face {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .face .icon { width: 100%; height: 100%; display: block; pointer-events: none; }
+  .face .badge {
+    position: absolute;
+    right: 5%;
+    bottom: 5%;
+    background: rgba(255,255,255,.88);
+    color: #7a5a22;
+    font-weight: 800;
+    border-radius: 7px;
+    padding: 0 5px;
+    line-height: 1.3;
+    box-shadow: 0 1px 3px rgba(120,80,20,.25);
+    pointer-events: none;
+  }
+  .tile.new .face { animation: appear 180ms ease 60ms both; }
+  .tile.pop .face { animation: pop 200ms ease; }
+  @keyframes appear { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
+  .overlay {
+    z-index: 10;
+    background: rgba(122, 90, 34, 0.55);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+    padding: 20px;
+  }
+  .overlay.hidden { display: none; }
+  .overlay .msg { font-size: 28px; font-weight: 900; color: #fff; }
+  .overlay .sub { color: #fff2d2; font-size: 14px; }
+  .overlay .btn { flex: none; width: 70%; margin-top: 6px; }
+  .foot { text-align: center; color: #b39563; font-size: 12px; margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top">
+    <h1 class="title">奶龙合成</h1>
+    <div class="scores">
+      <div class="score-box" id="score-box"><div class="label">分数</div><div class="value" id="score">0</div></div>
+      <div class="score-box"><div class="label">最佳</div><div class="value" id="best">0</div></div>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btn-new">新游戏</button>
+    <button class="btn btn-ghost" id="btn-undo" disabled>撤销</button>
+    <button class="btn btn-ghost btn-mute" id="btn-mute">🔊</button>
+  </div>
+  <p class="hint">滑动或按方向键（WASD 也可），合并奶龙，等级越高表情越离谱！</p>
+  <div class="board" id="board">
+    <div class="grid" id="grid"></div>
+    <div class="layer" id="layer"></div>
+    <div class="overlay hidden" id="overlay">
+      <div class="msg" id="overlay-msg"></div>
+      <div class="sub" id="overlay-sub"></div>
+      <button class="btn" id="overlay-btn1"></button>
+      <button class="btn btn-ghost" id="overlay-btn2"></button>
+    </div>
+  </div>
+  <p class="foot">恶搞二创 · 合成有音效（可点右上静音）· 最高分自动保存</p>
+</div>
+<script>
+'use strict';
+
+/* ================= 纯游戏逻辑（与 2048 相同，不依赖 DOM） ================= */
+var Logic = (function () {
+  var SIZE = 4;
+  var TARGET = 2048;
+
+  function emptyBoard() {
+    var b = [];
+    for (var r = 0; r < SIZE; r++) b.push([0, 0, 0, 0]);
+    return b;
+  }
+
+  function cloneBoard(b) {
+    return b.map(function (row) { return row.slice(); });
+  }
+
+  function availableCells(b) {
+    var cells = [];
+    for (var r = 0; r < SIZE; r++) {
+      for (var c = 0; c < SIZE; c++) {
+        if (b[r][c] === 0) cells.push({ r: r, c: c });
+      }
+    }
+    return cells;
+  }
+
+  function addRandomTile(b, rand) {
+    rand = rand || Math.random;
+    var cells = availableCells(b);
+    if (cells.length === 0) return null;
+    var cell = cells[Math.floor(rand() * cells.length)];
+    var value = rand() < 0.9 ? 2 : 4;
+    b[cell.r][cell.c] = value;
+    return { r: cell.r, c: cell.c, value: value };
+  }
+
+  function slideLine(vals) {
+    var result = [];
+    var slides = [];
+    var merges = [];
+    var nz = [];
+    var i, write;
+    for (i = 0; i < vals.length; i++) {
+      result.push(0);
+      if (vals[i] !== 0) nz.push({ v: vals[i], idx: i });
+    }
+    i = 0;
+    write = 0;
+    while (i < nz.length) {
+      var cur = nz[i];
+      if (i + 1 < nz.length && nz[i + 1].v === cur.v) {
+        var merged = cur.v * 2;
+        result[write] = merged;
+        merges.push({ a: cur.idx, b: nz[i + 1].idx, to: write, value: merged });
+        slides.push({ from: cur.idx, to: write });
+        slides.push({ from: nz[i + 1].idx, to: write });
+        i += 2;
+      } else {
+        result[write] = cur.v;
+        slides.push({ from: cur.idx, to: write });
+        i += 1;
+      }
+      write += 1;
+    }
+    return { result: result, slides: slides, merges: merges };
+  }
+
+  function getLines(b, dir) {
+    var lines = [];
+    var backs = [];
+    for (var i = 0; i < SIZE; i++) {
+      var line = [];
+      var back = [];
+      for (var k = 0; k < SIZE; k++) {
+        var r, c;
+        if (dir === 'left') { r = i; c = k; }
+        else if (dir === 'right') { r = i; c = SIZE - 1 - k; }
+        else if (dir === 'up') { r = k; c = i; }
+        else { r = SIZE - 1 - k; c = i; } /* down */
+        line.push({ r: r, c: c, v: b[r][c] });
+        back.push({ r: r, c: c });
+      }
+      lines.push(line);
+      backs.push(back);
+    }
+    return { lines: lines, backs: backs };
+  }
+
+  function move(b, dir) {
+    var gl = getLines(b, dir);
+    var next = emptyBoard();
+    var scoreGained = 0;
+    var slides = [];
+    var merges = [];
+    for (var li = 0; li < gl.lines.length; li++) {
+      var sl = slideLine(gl.lines[li].map(function (x) { return x.v; }));
+      for (var k = 0; k < SIZE; k++) {
+        var cell = gl.backs[li][k];
+        next[cell.r][cell.c] = sl.result[k];
+      }
+      for (var s = 0; s < sl.slides.length; s++) {
+        slides.push({ from: gl.lines[li][sl.slides[s].from], to: gl.backs[li][sl.slides[s].to] });
+      }
+      for (var m = 0; m < sl.merges.length; m++) {
+        var mg = sl.merges[m];
+        scoreGained += mg.value;
+        merges.push({
+          a: gl.lines[li][mg.a],
+          b: gl.lines[li][mg.b],
+          to: gl.backs[li][mg.to],
+          value: mg.value
+        });
+      }
+    }
+    var moved = slides.some(function (s) {
+      return s.from.r !== s.to.r || s.from.c !== s.to.c;
+    }) || merges.length > 0;
+    return {
+      board: next,
+      scoreGained: scoreGained,
+      moved: moved,
+      slides: slides,
+      merges: merges
+    };
+  }
+
+  function resolveTiles(res, tilesById) {
+    var targetOf = new Map();
+    for (var i = 0; i < res.slides.length; i++) {
+      var s = res.slides[i];
+      targetOf.set(s.from.r + ',' + s.from.c, s.to);
+    }
+    var byCell = new Map();
+    tilesById.forEach(function (t) { byCell.set(t.r + ',' + t.c, t); });
+    var absorbed = new Set();
+    var survivors = [];
+    var placements = [];
+    for (var m = 0; m < res.merges.length; m++) {
+      var mg = res.merges[m];
+      var tA = byCell.get(mg.a.r + ',' + mg.a.c);
+      var tB = byCell.get(mg.b.r + ',' + mg.b.c);
+      if (!tA || !tB) continue;
+      absorbed.add(tB.id);
+      survivors.push({ tile: tA, value: mg.value, r: mg.to.r, c: mg.to.c });
+    }
+    tilesById.forEach(function (t) {
+      var target = targetOf.get(t.r + ',' + t.c);
+      if (!target) return;
+      if (target.r === t.r && target.c === t.c) return;
+      if (!absorbed.has(t.id)) {
+        t.r = target.r;
+        t.c = target.c;
+      }
+      placements.push({ tile: t, r: target.r, c: target.c });
+    });
+    return { placements: placements, absorbed: absorbed, survivors: survivors };
+  }
+
+  function hasWon(b) {
+    for (var r = 0; r < SIZE; r++) {
+      for (var c = 0; c < SIZE; c++) {
+        if (b[r][c] >= TARGET) return true;
+      }
+    }
+    return false;
+  }
+
+  function isGameOver(b) {
+    for (var r = 0; r < SIZE; r++) {
+      for (var c = 0; c < SIZE; c++) {
+        if (b[r][c] === 0) return false;
+        if (c + 1 < SIZE && b[r][c] === b[r][c + 1]) return false;
+        if (r + 1 < SIZE && b[r][c] === b[r + 1][c]) return false;
+      }
+    }
+    return true;
+  }
+
+  return {
+    SIZE: SIZE,
+    TARGET: TARGET,
+    emptyBoard: emptyBoard,
+    cloneBoard: cloneBoard,
+    availableCells: availableCells,
+    addRandomTile: addRandomTile,
+    slideLine: slideLine,
+    move: move,
+    resolveTiles: resolveTiles,
+    hasWon: hasWon,
+    isGameOver: isGameOver
+  };
+})();
+
+if (typeof window !== 'undefined') window.GAME = Logic;
+
+/* ================= 奶龙图标（纯 SVG 字符串，可测试；想换真图改这里） ================= */
+var NailongIcons = (function () {
+  function star4(x, y, r) {
+    var pts = [
+      [x, y - r], [x + r * 0.38, y - r * 0.38], [x + r, y], [x + r * 0.38, y + r * 0.38],
+      [x, y + r], [x - r * 0.38, y + r * 0.38], [x - r, y], [x - r * 0.38, y - r * 0.38]
+    ];
+    var s = '';
+    for (var i = 0; i < pts.length; i++) s += pts[i][0].toFixed(1) + ',' + pts[i][1].toFixed(1) + ' ';
+    return '<polygon points="' + s.trim() + '" fill="#ffd23f" stroke="#e0a92e" stroke-width="1.2"/>';
+  }
+
+  function star5(x, y, r) {
+    var pts = [];
+    for (var i = 0; i < 10; i++) {
+      var ang = -Math.PI / 2 + i * Math.PI / 5;
+      var rr = i % 2 === 0 ? r : r * 0.45;
+      pts.push([x + Math.cos(ang) * rr, y + Math.sin(ang) * rr]);
+    }
+    var s = '';
+    for (var j = 0; j < pts.length; j++) s += pts[j][0].toFixed(1) + ',' + pts[j][1].toFixed(1) + ' ';
+    return '<polygon points="' + s.trim() + '" fill="#ff8c1a" stroke="#4a3728" stroke-width="1.4"/>';
+  }
+
+  function eyes(kind) {
+    if (kind === 'round') {
+      return '<circle cx="40" cy="48" r="5.2" fill="#4a3728"/><circle cx="60" cy="48" r="5.2" fill="#4a3728"/>'
+        + '<circle cx="38.4" cy="46.4" r="1.6" fill="#fff"/><circle cx="58.4" cy="46.4" r="1.6" fill="#fff"/>';
+    }
+    if (kind === 'happy') {
+      return '<path d="M33 48 Q40 40 47 48" fill="none" stroke="#4a3728" stroke-width="3" stroke-linecap="round"/>'
+        + '<path d="M53 48 Q60 40 67 48" fill="none" stroke="#4a3728" stroke-width="3" stroke-linecap="round"/>';
+    }
+    if (kind === 'wink') {
+      return '<circle cx="40" cy="48" r="5.2" fill="#4a3728"/><circle cx="38.4" cy="46.4" r="1.6" fill="#fff"/>'
+        + '<path d="M53 48 Q60 40 67 48" fill="none" stroke="#4a3728" stroke-width="3" stroke-linecap="round"/>';
+    }
+    if (kind === 'wide') {
+      return '<circle cx="40" cy="47" r="7" fill="#fff" stroke="#4a3728" stroke-width="2"/>'
+        + '<circle cx="60" cy="47" r="7" fill="#fff" stroke="#4a3728" stroke-width="2"/>'
+        + '<circle cx="40" cy="47" r="2.6" fill="#4a3728"/><circle cx="60" cy="47" r="2.6" fill="#4a3728"/>';
+    }
+    if (kind === 'cool') {
+      return '<rect x="30" y="41" width="17" height="12" rx="4" fill="#33303d"/>'
+        + '<rect x="53" y="41" width="17" height="12" rx="4" fill="#33303d"/>'
+        + '<path d="M47 46 L53 46" stroke="#33303d" stroke-width="2.5"/>'
+        + '<circle cx="34.5" cy="45" r="1.2" fill="#fff"/><circle cx="57.5" cy="45" r="1.2" fill="#fff"/>';
+    }
+    if (kind === 'angry') {
+      return '<circle cx="40" cy="49" r="5" fill="#4a3728"/><circle cx="60" cy="49" r="5" fill="#4a3728"/>'
+        + '<path d="M32 39 L48 44" stroke="#e0553f" stroke-width="3.2" stroke-linecap="round"/>'
+        + '<path d="M68 39 L52 44" stroke="#e0553f" stroke-width="3.2" stroke-linecap="round"/>';
+    }
+    if (kind === 'cry') {
+      return '<circle cx="40" cy="48" r="5" fill="#4a3728"/><circle cx="60" cy="48" r="5" fill="#4a3728"/>'
+        + '<path d="M40 52 Q37 58 36 60.5 A3.5 3.5 0 0 0 44 60.5 Q43 58 40 52 Z" fill="#7ec8ff" stroke="#5cb2ee" stroke-width="1.2"/>'
+        + '<path d="M60 52 Q57 58 56 60.5 A3.5 3.5 0 0 0 64 60.5 Q63 58 60 52 Z" fill="#7ec8ff" stroke="#5cb2ee" stroke-width="1.2"/>';
+    }
+    if (kind === 'evil') {
+      return '<path d="M32 48 A8 8 0 0 1 48 48 Z" fill="#4a3728"/>'
+        + '<path d="M52 48 A8 8 0 0 1 68 48 Z" fill="#4a3728"/>'
+        + '<circle cx="40" cy="46.5" r="1.4" fill="#fff"/><circle cx="60" cy="46.5" r="1.4" fill="#fff"/>';
+    }
+    if (kind === 'flat') {
+      return '<rect x="32" y="45.5" width="16" height="3" rx="1.5" fill="#4a3728"/>'
+        + '<rect x="52" y="45.5" width="16" height="3" rx="1.5" fill="#4a3728"/>';
+    }
+    if (kind === 'star') {
+      return star5(40, 48, 7.5) + star5(60, 48, 7.5);
+    }
+    /* x 形眼睛（究极形态） */
+    return '<path d="M33 41 L47 55" stroke="#4a3728" stroke-width="3.4" stroke-linecap="round"/>'
+      + '<path d="M47 41 L33 55" stroke="#4a3728" stroke-width="3.4" stroke-linecap="round"/>'
+      + '<path d="M53 41 L67 55" stroke="#4a3728" stroke-width="3.4" stroke-linecap="round"/>'
+      + '<path d="M67 41 L53 55" stroke="#4a3728" stroke-width="3.4" stroke-linecap="round"/>';
+  }
+
+  function mouth(kind) {
+    if (kind === 'smile') return '<path d="M41 62 Q50 70 59 62" fill="none" stroke="#8a4b3a" stroke-width="3" stroke-linecap="round"/>';
+    if (kind === 'open') return '<ellipse cx="50" cy="65" rx="6.5" ry="7" fill="#7a3f35"/><ellipse cx="50" cy="68.5" rx="3.5" ry="2.2" fill="#ff8f8f"/>';
+    if (kind === 'laugh') return '<path d="M38 60 Q50 80 62 60 Z" fill="#7a3f35"/><ellipse cx="50" cy="70" rx="7" ry="4" fill="#ff8f8f"/>';
+    if (kind === 'frown') return '<path d="M41 68 Q50 60 59 68" fill="none" stroke="#8a4b3a" stroke-width="3" stroke-linecap="round"/>';
+    if (kind === 'flat') return '<path d="M42 64 L58 64" stroke="#8a4b3a" stroke-width="3" stroke-linecap="round"/>';
+    if (kind === 'grin') {
+      return '<path d="M40 62 Q50 71 60 62" fill="none" stroke="#8a4b3a" stroke-width="3" stroke-linecap="round"/>'
+        + '<polygon points="44,63 46,69 48,63.5" fill="#fff"/>'
+        + '<polygon points="52,63.5 54,69 56,63" fill="#fff"/>';
+    }
+    if (kind === 'wavy') return '<path d="M40 67 Q45 61 50 67 T60 67" fill="none" stroke="#8a4b3a" stroke-width="3" stroke-linecap="round"/>';
+    return '<path d="M41 62 Q50 70 59 62" fill="none" stroke="#8a4b3a" stroke-width="3" stroke-linecap="round"/>';
+  }
+
+  /* 等级 0..11 对应 2,4,8,...,2048,4096+ */
+  var FACES = [
+    { bg: '#ffe9c4', eyes: 'round', mouth: 'smile', extra: '' },   /* 2 呆萌 */
+    { bg: '#ffe0ae', eyes: 'happy', mouth: 'smile', extra: '' },   /* 4 开心 */
+    { bg: '#ffd599', eyes: 'wink',  mouth: 'open',  extra: '' },   /* 8 眨眼吐舌 */
+    { bg: '#ffc49b', eyes: 'wide',  mouth: 'open',  extra: '' },   /* 16 震惊 */
+    { bg: '#ffa9a9', eyes: 'cool',  mouth: 'grin',  extra: '' },   /* 32 墨镜 */
+    { bg: '#ff8f8f', eyes: 'angry', mouth: 'frown', extra: 'steam' },  /* 64 气到冒烟 */
+    { bg: '#f7b8e4', eyes: 'cry',   mouth: 'wavy',  extra: '' },   /* 128 大哭 */
+    { bg: '#cdb3f0', eyes: 'evil',  mouth: 'grin',  extra: '' },   /* 256 坏笑 */
+    { bg: '#aad7f0', eyes: 'flat',  mouth: 'flat',  extra: 'sweat' },  /* 512 无语流汗 */
+    { bg: '#a3e9c6', eyes: 'star',  mouth: 'laugh', extra: '' },   /* 1024 星星眼魔性笑 */
+    { bg: '#ffd23f', eyes: 'happy', mouth: 'smile', extra: 'crown' },  /* 2048 至尊奶龙 */
+    { bg: 'rainbow', eyes: 'x',     mouth: 'laugh', extra: 'sparkles' } /* 4096+ 究极形态 */
+  ];
+
+  function makeIcon(level) {
+    var f = FACES[Math.min(Math.max(level, 0), FACES.length - 1)];
+    var bgDef = '';
+    var bgFill = f.bg;
+    if (f.bg === 'rainbow') {
+      bgDef = '<defs><linearGradient id="rb" x1="0" y1="0" x2="1" y2="1">'
+        + '<stop offset="0" stop-color="#ff8f8f"/><stop offset="0.25" stop-color="#ffd23f"/>'
+        + '<stop offset="0.5" stop-color="#7ee08a"/><stop offset="0.75" stop-color="#6ec6ff"/>'
+        + '<stop offset="1" stop-color="#c9a6f5"/></linearGradient></defs>';
+      bgFill = 'url(#rb)';
+    }
+    var horns = '<path d="M33 27 Q32 12 44 12 Q41 20 40 27 Z" fill="#f6b93b" stroke="#e39b2a" stroke-width="1.4"/>'
+      + '<path d="M67 27 Q68 12 56 12 Q59 20 60 27 Z" fill="#f6b93b" stroke="#e39b2a" stroke-width="1.4"/>';
+    var extra = '';
+    if (f.extra === 'crown') {
+      extra = '<path d="M33 24 L36 13 L43 18 L50 7 L57 18 L64 13 L67 24 Z" fill="#ffd23f" stroke="#e0a92e" stroke-width="1.6"/>'
+        + '<rect x="33" y="21" width="34" height="5" rx="2" fill="#ffd23f" stroke="#e0a92e" stroke-width="1.2"/>';
+      horns = '';
+    } else if (f.extra === 'steam') {
+      extra = '<path d="M22 26 Q19 20 23 14" fill="none" stroke="#f26d4f" stroke-width="2.4" stroke-linecap="round"/>'
+        + '<path d="M78 26 Q81 20 77 14" fill="none" stroke="#f26d4f" stroke-width="2.4" stroke-linecap="round"/>';
+    } else if (f.extra === 'sweat') {
+      extra = '<path d="M72 32 Q80 41 72 48 Q64 41 72 32 Z" fill="#a8dcff" stroke="#5cb2ee" stroke-width="1.4"/>';
+    } else if (f.extra === 'sparkles') {
+      extra = star4(21, 30, 7) + star4(79, 32, 7) + star4(28, 14, 5);
+    }
+    var head = '<ellipse cx="50" cy="56" rx="29" ry="26" fill="#fff8e1" stroke="#eebd4f" stroke-width="2.6"/>';
+    var blush = '<ellipse cx="31" cy="63" rx="4.6" ry="2.8" fill="#ffc2a8" opacity="0.9"/>'
+      + '<ellipse cx="69" cy="63" rx="4.6" ry="2.8" fill="#ffc2a8" opacity="0.9"/>';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' + bgDef
+      + '<rect width="100" height="100" rx="18" fill="' + bgFill + '"/>'
+      + extra + horns + head + blush + eyes(f.eyes) + mouth(f.mouth) + '</svg>';
+  }
+
+  function iconDataUri(level) {
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(makeIcon(level));
+  }
+
+  return { FACES: FACES, makeIcon: makeIcon, iconDataUri: iconDataUri };
+})();
+
+if (typeof window !== 'undefined') window.NAILONG = NailongIcons;
+
+/* ================= 界面部分（仅浏览器中执行） ================= */
+if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+  (function () {
+    var boardEl = document.getElementById('board');
+    if (!boardEl) return;
+    var layerEl = document.getElementById('layer');
+    var scoreEl = document.getElementById('score');
+    var bestEl = document.getElementById('best');
+    var scoreBoxEl = document.getElementById('score-box');
+    var overlayEl = document.getElementById('overlay');
+    var overlayMsg = document.getElementById('overlay-msg');
+    var overlaySub = document.getElementById('overlay-sub');
+    var overlayBtn1 = document.getElementById('overlay-btn1');
+    var overlayBtn2 = document.getElementById('overlay-btn2');
+    var btnNew = document.getElementById('btn-new');
+    var btnUndo = document.getElementById('btn-undo');
+    var btnMute = document.getElementById('btn-mute');
+    var gridEl = document.getElementById('grid');
+
+    var board = Logic.emptyBoard();
+    var score = 0;
+    var best = loadBest();
+    var tiles = new Map();
+    var nextTileId = 1;
+    var won = false;
+    var keepPlaying = false;
+    var gameOver = false;
+    var animating = false;
+    var pendingTimer = null;
+    var history = [];
+
+    var muted = loadMuted();
+    var audioCtx = null;
+
+    for (var i = 0; i < 16; i++) {
+      var cellEl = document.createElement('div');
+      cellEl.className = 'cell';
+      gridEl.appendChild(cellEl);
+    }
+
+    function loadBest() {
+      try {
+        var v = parseInt(window.localStorage.getItem('nailong_best') || '0', 10);
+        return isNaN(v) || v < 0 ? 0 : v;
+      } catch (e) { return 0; }
+    }
+    function saveBest() {
+      try { window.localStorage.setItem('nailong_best', String(best)); } catch (e) {}
+    }
+    function loadMuted() {
+      try { return window.localStorage.getItem('nailong_muted') === '1'; } catch (e) { return false; }
+    }
+    function saveMuted() {
+      try { window.localStorage.setItem('nailong_muted', muted ? '1' : '0'); } catch (e) {}
+    }
+
+    /* ---------- 音效（Web Audio 实时合成，无需音频文件） ---------- */
+    function ensureAudio() {
+      if (!audioCtx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        try { audioCtx = new AC(); } catch (e) { audioCtx = null; return; }
+      }
+      if (audioCtx.state === 'suspended') {
+        try { audioCtx.resume(); } catch (e) {}
+      }
+    }
+
+    function tone(t, freq, dur, gain, type) {
+      var o = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(freq, t);
+      o.frequency.exponentialRampToValueAtTime(freq * 1.9, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+
+    function playMerge(value) {
+      if (muted) return;
+      ensureAudio();
+      if (!audioCtx) return;
+      var level = Math.max(0, Math.round(Math.log(value) / Math.LN2) - 1);
+      var t0 = audioCtx.currentTime;
+      var base = 300 + level * 60;
+      tone(t0, base, 0.14, 0.30);
+      tone(t0 + 0.055, base * 1.5, 0.16, 0.22);
+      if (level >= 6) tone(t0 + 0.11, base * 2, 0.2, 0.18);
+      if (level >= 9) tone(t0 + 0.17, base * 2.5, 0.24, 0.16);
+    }
+
+    function playSlide() {
+      if (muted) return;
+      ensureAudio();
+      if (!audioCtx) return;
+      var t0 = audioCtx.currentTime;
+      var dur = 0.07;
+      var buf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * dur), audioCtx.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      var src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      var f = audioCtx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 900;
+      var g = audioCtx.createGain();
+      g.gain.value = 0.10;
+      src.connect(f);
+      f.connect(g);
+      g.connect(audioCtx.destination);
+      src.start(t0);
+    }
+
+    function playWin() {
+      if (muted) return;
+      ensureAudio();
+      if (!audioCtx) return;
+      var t0 = audioCtx.currentTime;
+      var notes = [523.25, 659.25, 783.99, 1046.5];
+      for (var i = 0; i < notes.length; i++) tone(t0 + i * 0.12, notes[i], 0.18, 0.25, 'triangle');
+    }
+
+    function playLose() {
+      if (muted) return;
+      ensureAudio();
+      if (!audioCtx) return;
+      var t0 = audioCtx.currentTime;
+      var notes = [392, 329.63, 261.63];
+      for (var i = 0; i < notes.length; i++) tone(t0 + i * 0.16, notes[i], 0.2, 0.22, 'triangle');
+    }
+
+    function unlockAudio() { ensureAudio(); }
+    document.addEventListener('touchstart', unlockAudio, { passive: true });
+    document.addEventListener('keydown', unlockAudio);
+    document.addEventListener('mousedown', unlockAudio);
+
+    /* ---------- 布局与渲染 ---------- */
+    function cellMetrics() {
+      var bw = boardEl.clientWidth || 320;
+      var pad = 10, gap = 10;
+      var cell = (bw - pad * 2 - gap * 3) / 4;
+      return { pad: pad, gap: gap, cell: cell };
+    }
+
+    function tilePos(r, c) {
+      var m = cellMetrics();
+      return {
+        x: m.pad + c * (m.cell + m.gap),
+        y: m.pad + r * (m.cell + m.gap),
+        size: m.cell
+      };
+    }
+
+    function levelOf(value) {
+      return Math.max(0, Math.round(Math.log(value) / Math.LN2) - 1);
+    }
+
+    function createTileEl(t) {
+      var el = document.createElement('div');
+      el.className = 'tile' + (t.isNew ? ' new' : '');
+      var face = document.createElement('div');
+      face.className = 'face';
+      var img = document.createElement('img');
+      img.className = 'icon';
+      img.alt = '';
+      img.src = NailongIcons.iconDataUri(levelOf(t.value));
+      face.appendChild(img);
+      var badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = t.value;
+      face.appendChild(badge);
+      el.appendChild(face);
+      layerEl.appendChild(el);
+      t.el = el;
+      placeTile(t, t.r, t.c);
+      return el;
+    }
+
+    function placeTile(t, r, c) {
+      var p = tilePos(r, c);
+      t.r = r;
+      t.c = c;
+      t.el.style.width = p.size + 'px';
+      t.el.style.height = p.size + 'px';
+      t.el.style.transform = 'translate(' + p.x + 'px,' + p.y + 'px)';
+      var badge = t.el.querySelector('.badge');
+      if (badge) badge.style.fontSize = Math.round(p.size * 0.26) + 'px';
+    }
+
+    function renderAll() {
+      for (var r = 0; r < Logic.SIZE; r++) {
+        for (var c = 0; c < Logic.SIZE; c++) {
+          var v = board[r][c];
+          if (v !== 0) {
+            var t = { id: nextTileId++, r: r, c: c, value: v, isNew: true };
+            tiles.set(t.id, t);
+            createTileEl(t);
+          }
+        }
+      }
+    }
+
+    function clearTiles() {
+      tiles.forEach(function (t) { t.el.remove(); });
+      tiles.clear();
+    }
+
+    function updateScoreUI(bump) {
+      scoreEl.textContent = score;
+      if (score > best) { best = score; saveBest(); }
+      bestEl.textContent = best;
+      if (bump) {
+        scoreBoxEl.classList.remove('bump');
+        void scoreBoxEl.offsetWidth;
+        scoreBoxEl.classList.add('bump');
+      }
+    }
+
+    function updateUndoBtn() {
+      btnUndo.disabled = animating || history.length === 0;
+    }
+
+    function showOverlay(kind) {
+      if (kind === 'win') {
+        overlayMsg.textContent = '合出至尊奶龙！';
+        overlaySub.textContent = '已合成 2048，继续挑战究极形态？';
+        overlayBtn1.textContent = '继续游戏';
+        overlayBtn2.textContent = '再来一局';
+        playWin();
+      } else {
+        overlayMsg.textContent = '游戏结束';
+        overlaySub.textContent = '本局得分：' + score;
+        overlayBtn1.textContent = '再来一局';
+        overlayBtn2.textContent = '撤销一步';
+        playLose();
+      }
+      overlayEl.classList.remove('hidden');
+    }
+
+    function hideOverlay() { overlayEl.classList.add('hidden'); }
+
+    function checkEndState() {
+      if (!won && Logic.hasWon(board)) {
+        won = true;
+        if (!keepPlaying) {
+          showOverlay('win');
+          return;
+        }
+      }
+      if (Logic.isGameOver(board)) {
+        gameOver = true;
+        showOverlay('lose');
+      }
+    }
+
+    function applyMove(res) {
+      if (!res.moved) return false;
+      history.push({ board: Logic.cloneBoard(board), score: score });
+      if (history.length > 60) history.shift();
+
+      playSlide();
+      var rt = Logic.resolveTiles(res, tiles);
+      for (var i = 0; i < rt.placements.length; i++) {
+        var p = rt.placements[i];
+        if (rt.absorbed.has(p.tile.id)) p.tile.el.style.zIndex = '1';
+        placeTile(p.tile, p.r, p.c);
+      }
+      board = res.board;
+      score += res.scoreGained;
+      updateScoreUI(res.scoreGained > 0);
+      if (res.scoreGained > 0 && typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(10); } catch (e) {}
+      }
+      animating = true;
+      updateUndoBtn();
+      pendingTimer = setTimeout(function () {
+        pendingTimer = null;
+        for (var s = 0; s < rt.survivors.length; s++) {
+          var sv = rt.survivors[s];
+          var t = sv.tile;
+          t.value = sv.value;
+          t.el.className = 'tile pop';
+          var face = t.el.querySelector('.face');
+          var img = t.el.querySelector('.icon');
+          if (img) img.src = NailongIcons.iconDataUri(levelOf(sv.value));
+          if (face) {
+            var badge = face.querySelector('.badge');
+            if (badge) badge.textContent = sv.value;
+          }
+          t.el.style.zIndex = '';
+          placeTile(t, sv.r, sv.c);
+          playMerge(sv.value);
+          (function (el) {
+            setTimeout(function () { el.classList.remove('pop'); }, 220);
+          })(t.el);
+        }
+        rt.absorbed.forEach(function (id) {
+          var t = tiles.get(id);
+          if (t) { t.el.remove(); tiles.delete(id); }
+        });
+        var spawned = Logic.addRandomTile(board);
+        if (spawned) {
+          var nt = { id: nextTileId++, r: spawned.r, c: spawned.c, value: spawned.value, isNew: true };
+          tiles.set(nt.id, nt);
+          createTileEl(nt);
+        }
+        animating = false;
+        updateUndoBtn();
+        checkEndState();
+      }, 140);
+      return true;
+    }
+
+    function tryMove(dir) {
+      if (animating || gameOver || !overlayEl.classList.contains('hidden')) return;
+      applyMove(Logic.move(board, dir));
+    }
+
+    function newGame() {
+      if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
+      board = Logic.emptyBoard();
+      score = 0;
+      history.length = 0;
+      won = false;
+      keepPlaying = false;
+      gameOver = false;
+      animating = false;
+      clearTiles();
+      Logic.addRandomTile(board);
+      Logic.addRandomTile(board);
+      renderAll();
+      hideOverlay();
+      updateScoreUI(false);
+      updateUndoBtn();
+    }
+
+    function undo() {
+      if (animating || history.length === 0) return;
+      var snap = history.pop();
+      board = snap.board;
+      score = snap.score;
+      won = Logic.hasWon(board);
+      gameOver = false;
+      clearTiles();
+      renderAll();
+      hideOverlay();
+      updateScoreUI(false);
+      updateUndoBtn();
+    }
+
+    btnNew.addEventListener('click', newGame);
+    btnUndo.addEventListener('click', undo);
+    btnMute.addEventListener('click', function () {
+      muted = !muted;
+      saveMuted();
+      btnMute.textContent = muted ? '🔇' : '🔊';
+      if (!muted) ensureAudio();
+    });
+
+    overlayBtn1.addEventListener('click', function () {
+      if (overlayBtn1.textContent === '继续游戏') {
+        keepPlaying = true;
+        hideOverlay();
+        checkEndState();
+      } else {
+        newGame();
+      }
+    });
+    overlayBtn2.addEventListener('click', function () {
+      if (overlayBtn2.textContent === '撤销一步') undo();
+      else newGame();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      var map = {
+        ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+        a: 'left', d: 'right', w: 'up', s: 'down',
+        A: 'left', D: 'right', W: 'up', S: 'down'
+      };
+      var dir = map[e.key];
+      if (dir) {
+        e.preventDefault();
+        tryMove(dir);
+      }
+    });
+
+    var touchStart = null;
+    boardEl.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }, { passive: true });
+    boardEl.addEventListener('touchmove', function (e) {
+      e.preventDefault();
+    }, { passive: false });
+    boardEl.addEventListener('touchend', function (e) {
+      if (!touchStart) return;
+      var t = e.changedTouches[0];
+      var dx = t.clientX - touchStart.x;
+      var dy = t.clientY - touchStart.y;
+      touchStart = null;
+      var ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.max(ax, ay) < 24) return;
+      var dir = ax > ay ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      tryMove(dir);
+    });
+    boardEl.addEventListener('touchcancel', function () { touchStart = null; });
+    boardEl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    window.addEventListener('resize', function () {
+      tiles.forEach(function (t) { placeTile(t, t.r, t.c); });
+    });
+
+    btnMute.textContent = muted ? '🔇' : '🔊';
+    newGame();
+  })();
+}
+</script>
+</body>
+</html>
